@@ -133,4 +133,8 @@ class NestedCheckboxSetField extends CheckboxSetField {
 	public function Type() {
 		return 'optionset checkboxset nestedcheckboxset';
 	}
+
+	public function validate($validator) {
+		return true;
+	}
 }
