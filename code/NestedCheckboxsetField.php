@@ -1,44 +1,18 @@
 <?php
+
 class NestedCheckboxSetField extends CheckboxSetField {
-	private $rootClass;
-
-	private $rootTitle;
-
-	private $childRelation;
-
-	private $childTitle;
-
-	/**
-	 * @param $rootClass string Sets the root class (which the relationships should be held within)
-	 * @return NestedCheckboxSetField This object (for chaining)
-	 */
-	public function setRootClass($rootClass) {
-		$this->rootClass = $rootClass;
-		return $this;
-	}
-
-	public function setRootTitle($rootTitle) {
-		$this->rootTitle = $rootTitle;
-		return $this;
-	}
-
-	public function setChildRelation($childRelation) {
-		$this->childRelation = $childRelation;
-		return $this;
-	}
-
-	public function setChildTitle($childTitle) {
-		$this->childTitle = $childTitle;
-		return $this;
-	}
 
 	public function Field($properties = array()) {
 		Requirements::css(MODULE_NESTEDCHECKBOXSETFIELD_DIR . '/css/NestedCheckboxSetField.css');
 
-		$rootSourceParam = $this->rootClass;
-		$rootTitleParam = $this->rootTitle;
-		$childRelationParam = $this->childRelation;
-		$childTitleParam = $this->childTitle;
+		$properties = array_merge($properties, array(
+			'Options' => $this->getOptions()
+		));
+
+		return $this->customise($properties)->renderWith($this->getTemplates());
+	}
+
+	public function getOptions() {
 		$source = $this->source;
 		$values = $this->value;
 		$items = array();
@@ -57,77 +31,46 @@ class NestedCheckboxSetField extends CheckboxSetField {
 			}
 		}
 
-		// Source is not an array
-		if(!is_array($source) && !is_a($source, 'SQLMap')) {
-			if(is_array($values)) {
-				$items = $values;
-			} else {
-				// Source and values are DataObject sets.
-				if($values && is_a($values, 'SS_List')) {
-					foreach($values as $object) {
-						if(is_a($object, 'DataObject')) {
-							$items[] = $object->ID;
-						}
-					}
-				} elseif($values && is_string($values)) {
-					$items = explode(',', $values);
-					$items = str_replace('{comma}', ',', $items);
-				}
-			}
-		} else {
-			// Sometimes we pass a singluar default value thats ! an array && !SS_List
-			if($values instanceof SS_List || is_array($values)) {
-				$items = $values;
-			} else {
-				$items = explode(',', $values);
-				$items = str_replace('{comma}', ',', $items);
-			}
+		if(is_array($values)) {
+			$items = $values;
 		}
 
-		$rootSources = $rootSourceParam::get()->sort("$rootTitleParam ASC");
-		$rootOptions = array();
-		$rootOdd = 0;
+		if (is_array($source)) {
+			unset($source['']);
+		}
 
-		foreach($rootSources as $source) {
-			// $source is an instance of $this->rootClass, which we can call $this->childRelation() on
-			$childSources = $source->$childRelationParam()->sort("$childTitleParam ASC");
-			$rootTitle = $source->$rootTitleParam;
-			$childArray = array();
-			$childOdd = 0;
+		if ($source == null) {
+			$source = array();
+		}
 
-			foreach($childSources as $childSource) {
-				$title = $childSource->$childTitleParam;
-				$value = $childSource->ID;
-				$itemID = $this->ID() . '_' . preg_replace('/[^a-zA-Z0-9]/', '', $value);
-				$childOdd = ($childOdd + 1) % 2;
-				$extraClass = $childOdd ? 'odd' : 'even';
-				$extraClass .= ' val' . preg_replace('/[^a-zA-Z0-9\-\_]/', '_', $value);
+		$options = new ArrayList();
 
-				$childArray[] = new ArrayData(array(
-					'ID' => $itemID,
-					'Class' => $extraClass,
+		foreach($source as $sourceGroup => $childSource) {
+			$childOptions = new ArrayList();
+
+			foreach ($childSource as $value => $title) {
+				$optionItem = new ArrayData(array(
+					'ID' => $this->ID() . '_' . preg_replace('/[^a-zA-Z0-9]/', '', $value),
+					'Class' => $this->extraClass(),
 					'Name' => "{$this->name}[{$value}]",
 					'Value' => $value,
 					'Title' => $title,
 					'isChecked' => in_array($value, $items) || in_array($value, $this->defaultItems),
 					'isDisabled' => $this->disabled || in_array($value, $this->disabledItems)
 				));
+
+				$childOptions->push($optionItem);
 			}
 
-			$rootOdd = ($rootOdd + 1) % 2;
-			$extraClass = $rootOdd ? 'odd' : 'even';
-
-			$rootOptions[] = new ArrayData(array(
-				'Title' => $rootTitle,
-				'Class' => $extraClass,
-				'Options' => new ArrayList($childArray)
-			));
+			$options->push(new ArrayData(array(
+				'Title' => $sourceGroup,
+				'ChildOptions' => $childOptions
+			)));
 		}
 
-		// $rootOptions is now the complete ArrayData of options => sub-options
-		$properties = array_merge($properties, array('Options' => new ArrayList($rootOptions)));
+		$this->extend('updateGetOptions', $options);
 
-		return $this->customise($properties)->renderWith($this->getTemplates());
+		return $options;
 	}
 
 	public function Type() {
@@ -135,6 +78,39 @@ class NestedCheckboxSetField extends CheckboxSetField {
 	}
 
 	public function validate($validator) {
+		$values = $this->value;
+
+		if (!$values) {
+			return true;
+		}
+
+		$sourceArray = array_keys($this->getSourceAsFlatArray());
+
+		if (count(array_diff($values, $sourceArray)) > 0) {
+			$validator->validationError(
+				$this->name,
+				_t(
+					'CheckboxSetField.SOURCE_VALIDATION',
+					"Please select a value within the list provided. '{value}' is not a valid option",
+					array('value' => implode(' and ', array_diff($values, $sourceArray)))
+				),
+				"validation"
+			);
+
+			return false;
+		}
+
 		return true;
 	}
+
+	private function getSourceAsFlatArray() {
+		$flatSource = array();
+
+		foreach ($this->source as $key => $source) {
+			$flatSource = $flatSource + $source;
+		}
+
+		return $flatSource;
+	}
+
 }
