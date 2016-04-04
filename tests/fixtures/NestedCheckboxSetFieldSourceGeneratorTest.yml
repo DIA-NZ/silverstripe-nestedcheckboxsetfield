@@ -1,0 +1,21 @@
+NestedCheckboxSetParent:
+  one:
+    Title: 'Parent 1'
+  two:
+    Title: 'Parent 2'
+NestedCheckboxSetChild:
+  one:
+    Title: 'Child 1'
+    Parent: =>NestedCheckboxSetParent.one
+  two:
+    Title: 'Child 2'
+    Parent: =>NestedCheckboxSetParent.one
+  three:
+    Title: 'Child 3'
+    Parent: =>NestedCheckboxSetParent.two
+  four:
+    Title: 'Child 4'
+    Parent: =>NestedCheckboxSetParent.two
+  five:
+    Title: 'Child 5'
+    Parent: =>NestedCheckboxSetParent.two
