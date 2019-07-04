@@ -1,4 +1,7 @@
 <?php
+
+use SilverStripe\Forms\CheckboxSetField;
+
 class NestedCheckboxSetField extends CheckboxSetField {
 	private $rootClass;
 
