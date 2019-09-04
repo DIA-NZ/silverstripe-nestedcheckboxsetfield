@@ -1,4 +1,10 @@
 <?php
+
+use SilverStripe\Forms\CheckboxSetField;
+use SilverStripe\View\Requirements;
+use SilverStripe\View\ArrayData;
+use SilverStripe\ORM\ArrayList;
+
 class NestedCheckboxSetField extends CheckboxSetField {
 	private $rootClass;
 
