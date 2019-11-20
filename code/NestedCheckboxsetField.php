@@ -139,4 +139,58 @@ class NestedCheckboxSetField extends CheckboxSetField {
 	public function Type() {
 		return 'optionset checkboxset nestedcheckboxset';
 	}
+
+	public function getValidValues() {
+		$rootSourceParam = $this->rootClass;
+		$rootTitleParam = $this->rootTitle;
+		$childRelationParam = $this->childRelation;
+		$childTitleParam = $this->childTitle;
+		$source = $this->source;
+		$values = $this->value;
+		$validValues = array();
+
+		// Get values from the join, if available
+		if(is_object($this->form)) {
+			$record = $this->form->getRecord();
+			if(!$values && $record && $record->hasMethod($this->name)) {
+				$funcName = $this->name;
+				$join = $record->$funcName();
+				if($join) {
+					foreach($join as $joinItem) {
+						$values[] = $joinItem->ID;
+					}
+				}
+			}
+		}
+
+		// Source is not an array
+		if(!is_array($source) && !is_a($source, 'SQLMap')) {
+			if(is_array($values)) {
+				$validValues = $values;
+			} else {
+				// Source and values are DataObject sets.
+				if($values && is_a($values, 'SS_List')) {
+					foreach($values as $object) {
+						if(is_a($object, 'DataObject')) {
+							$validValues[] = $object->ID;
+						}
+					}
+				} elseif($values && is_string($values)) {
+					$validValues = explode(',', $values);
+					$validValues = str_replace('{comma}', ',', $validValues);
+				}
+			}
+		} else {
+			// Sometimes we pass a singluar default value thats ! an array && !SS_List
+			if($values instanceof SS_List || is_array($values)) {
+				$validValues = $values;
+			} else {
+				$validValues = explode(',', $values);
+				$validValues = str_replace('{comma}', ',', $validValues);
+			}
+		}
+		
+		return $validValues;
+	}
+
 }
